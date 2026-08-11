@@ -42,10 +42,11 @@ namespace PivotTable_EFCore.Server.Controllers
         /// <returns>Returns the data records along with the total count.</returns>
         [HttpPost]
         [Route("api/[controller]")]
-        public object Post([FromBody] DataManagerRequest DataManagerRequest)
+        public async Task<object> Post([FromBody] DataManagerRequest DataManagerRequest)
         {
             // Retrieve all sales data from the database
-            IQueryable<SalesData> DataSource = _db.SalesData.AsNoTracking();
+            List<SalesData> salesData = await _db.SalesData.AsNoTracking().ToListAsync();
+            IQueryable<SalesData> DataSource = salesData.AsQueryable();
 
             // Get the total number of records
             int totalRecordsCount = DataSource.Count();
@@ -62,7 +63,7 @@ namespace PivotTable_EFCore.Server.Controllers
         /// <returns>Returns the inserted record with its new OrderID.</returns>
         [HttpPost]
         [Route("api/[controller]/Insert")]
-        public IActionResult Insert([FromBody] CRUDModel<SalesData> value)
+        public async Task<IActionResult> Insert([FromBody] CRUDModel<SalesData> value)
         {
             if (value?.Value == null)
                 return BadRequest("A sales record is required.");
@@ -71,7 +72,7 @@ namespace PivotTable_EFCore.Server.Controllers
             {
                 // EF Core assigns the new OrderID via IDENTITY after SaveChanges.
                 _db.SalesData.Add(value.Value);
-                _db.SaveChanges();
+                await _db.SaveChangesAsync();
 
                 return Ok(new { key = value.Value.OrderID, value = value.Value });
             }
@@ -89,7 +90,7 @@ namespace PivotTable_EFCore.Server.Controllers
         /// <returns>Returns the number of rows updated.</returns>
         [HttpPost]
         [Route("api/[controller]/Update")]
-        public IActionResult Update([FromBody] CRUDModel<SalesData> value)
+        public async Task<IActionResult> Update([FromBody] CRUDModel<SalesData> value)
         {
             if (value?.Value == null || value.Value.OrderID == null)
                 return BadRequest("OrderID and payload are required.");
@@ -99,7 +100,7 @@ namespace PivotTable_EFCore.Server.Controllers
                 // EntityState.Modified tells EF Core to UPDATE every mapped column
                 // of the row whose primary key matches value.value.OrderID.
                 _db.Entry(value.Value).State = EntityState.Modified;
-                _db.SaveChanges();
+                await _db.SaveChangesAsync();
 
                 return Ok(new { updated = 1, value = value.Value });
             }
@@ -116,7 +117,7 @@ namespace PivotTable_EFCore.Server.Controllers
         /// <returns>Returns the number of rows deleted.</returns>
         [HttpPost]
         [Route("api/[controller]/Remove")]
-        public IActionResult Remove([FromBody] CRUDModel<SalesData> value)
+        public async Task<IActionResult> Remove([FromBody] CRUDModel<SalesData> value)
         {
             if (value?.Key == null)
                 return BadRequest("Missing key.");
@@ -126,12 +127,12 @@ namespace PivotTable_EFCore.Server.Controllers
 
             try
             {
-                var existing = _db.SalesData.Find(id);
+                var existing = await _db.SalesData.FindAsync(id);
                 if (existing == null)
                     return NotFound("Record not found.");
 
                 _db.SalesData.Remove(existing);
-                _db.SaveChanges();
+                await _db.SaveChangesAsync();
 
                 return Ok(new { deleted = 1, key = id });
             }
